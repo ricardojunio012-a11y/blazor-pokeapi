@@ -1,0 +1,84 @@
+@page "/"
+@using System.Net
+@using System.Net.Http.Json
+@using BlazorPokeApi.Models
+@inject HttpClient Http
+
+<PageTitle>Buscar Pokémon</PageTitle>
+
+<h1>Buscar Pokémon</h1>
+
+<div class="mb-2">
+    <label for="nome" class="form-label">Nome do Pokémon:</label>
+    <input id="nome" class="form-control" placeholder="Ex.: pikachu"
+           @bind="nome" @bind:event="oninput" @onkeyup="AoTeclar" />
+</div>
+<button class="btn btn-primary" @onclick="BuscarPokemon" disabled="@carregando">
+    @(carregando ? "Buscando..." : "Buscar Pokémon")
+</button>
+
+<hr />
+
+@if (!string.IsNullOrEmpty(erro))
+{
+    <div class="alert alert-danger">@erro</div>
+}
+
+@if (pokemon is not null)
+{
+    <h2>Detalhes do Pokémon</h2>
+    @if (!string.IsNullOrEmpty(pokemon.Sprites.Other.OfficialArtwork.FrontDefault))
+    {
+        <img src="@pokemon.Sprites.Other.OfficialArtwork.FrontDefault" alt="@pokemon.Name" width="200" />
+    }
+    <p><strong>ID:</strong> @pokemon.Id</p>
+    <p><strong>Nome:</strong> @pokemon.Name</p>
+    <p><strong>Altura:</strong> @((pokemon.Height / 10.0).ToString("0.##")) m</p>
+    <p><strong>Peso:</strong> @((pokemon.Weight / 10.0).ToString("0.##")) kg</p>
+}
+
+@code {
+    private string nome = string.Empty;
+    private Pokemon? pokemon;
+    private string? erro;
+    private bool carregando;
+
+    private async Task AoTeclar(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await BuscarPokemon();
+    }
+
+    private async Task BuscarPokemon()
+    {
+        erro = null;
+        pokemon = null;
+
+        var busca = nome.Trim().ToLowerInvariant();
+        if (string.IsNullOrEmpty(busca))
+        {
+            erro = "Digite o nome do Pokémon.";
+            return;
+        }
+
+        carregando = true;
+        try
+        {
+            var resposta = await Http.GetAsync($"pokemon/{Uri.EscapeDataString(busca)}");
+            if (resposta.StatusCode == HttpStatusCode.NotFound)
+            {
+                erro = $"Pokémon \"{busca}\" não encontrado.";
+                return;
+            }
+            resposta.EnsureSuccessStatusCode();
+            pokemon = await resposta.Content.ReadFromJsonAsync<Pokemon>();
+        }
+        catch (Exception ex)
+        {
+            erro = $"Erro ao consultar a API: {ex.Message}";
+        }
+        finally
+        {
+            carregando = false;
+        }
+    }
+}
